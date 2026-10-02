@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="HYDEV Project Manager - Track and manage your projects">
+    <meta name="theme-color" content="#0C0C0C">
+    <title> HYDEV Project Manager</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="hydev-logo.png">
+    <link rel="apple-touch-icon" href="hydev-logo.png">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-section">
+                <img src="hydev-logo.png" alt="HYDEV" class="logo-wordmark">
+                <h1 class="app-title">HYDEV Project Manager</h1>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" id="exportBtn" title="Export projects">📤 Export</button>
+                <button class="btn btn-secondary" id="importBtn" title="Import projects">📥 Import</button>
+                <input type="file" id="importFile" accept=".json" style="display:none">
+                <button class="theme-toggle" id="settingsBtn" title="Settings">
+                    <span>⚙️</span>
+                </button>
+                <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+                    <span id="themeIcon">🌙</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Page navigation -->
+        <nav class="page-nav" aria-label="Project pages">
+            <button class="page-nav-link active" id="dashboardNavBtn" data-view="dashboard">Home</button>
+            <button class="page-nav-link" id="projectsNavBtn" data-view="projects">All Projects</button>
+            <button class="page-nav-link" id="progressNavBtn" data-view="progress">Progress</button>
+        </nav>
+
+        <main id="dashboardView" class="page-view active">
+            <div class="page-heading home-heading">
+                <div>
+                    <p class="eyebrow">YOUR WORKSPACE</p>
+                    <h2>My Projects</h2>
+                    <p class="page-description">A focused view of your workspace.</p>
+                </div>
+                <button class="btn btn-primary" id="homeAddProjectBtn">＋ New Project</button>
+            </div>
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="search-container">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" class="search-input" id="searchInput" placeholder="Search projects... (Ctrl+K or /)">
+                    <button class="clear-search-btn" id="clearSearchBtn" title="Clear search" aria-label="Clear search" style="display:none">✕</button>
+                </div>
+                <button class="btn btn-primary" id="addProjectBtn">➕ Add Project</button>
+                <button class="btn btn-secondary" id="allProjectsBtn">All Projects →</button>
+            </div>
+            <section class="home-section home-project-section" id="pinnedSection" hidden>
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">TOP PRIORITY</p>
+                        <h3>Pinned projects</h3>
+                    </div>
+                </div>
+                <div class="projects-grid" id="pinnedProjectsGrid"></div>
+            </section>
+            <section class="home-section home-project-section" id="latestSection" hidden>
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">LATEST ADDITIONS</p>
+                        <h3>Recently added</h3>
+                    </div>
+                </div>
+                <div class="projects-grid" id="projectsGrid"></div>
+            </section>
+            <section class="home-section home-project-section" id="recentSection" hidden>
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">ACTIVITY</p>
+                        <h3>Recently opened</h3>
+                    </div>
+                </div>
+                <div class="projects-grid" id="recentProjectsGrid"></div>
+            </section>
+            <div class="empty-state" id="emptyState" style="display:none">
+                <div class="empty-state-icon">📁</div>
+                <h2>No projects yet</h2>
+                <p>Add your first project folder to start building your workspace.</p>
+                <button class="btn btn-primary" id="emptyAddProjectBtn">＋ Create New Project</button>
+            </div>
+        </main>
+
+        <main id="projectsView" class="page-view" hidden>
+            <div class="page-heading projects-heading">
+                <div>
+                    <p class="eyebrow">PROJECT LIBRARY</p>
+                    <h2>All Projects</h2>
+                    <p class="page-description">Track new ideas, active work, and finished projects in one place.</p>
+                </div>
+                <button class="btn btn-primary start-project-btn" id="startProjectBtn">＋ Start Project</button>
+            </div>
+            <div class="project-status-panel">
+                <div class="status-filter-group" role="group" aria-label="Filter projects by status">
+                    <button class="status-filter active" data-status-filter="all">All</button>
+                    <button class="status-filter" data-status-filter="new">New</button>
+                    <button class="status-filter" data-status-filter="working">Working</button>
+                    <button class="status-filter" data-status-filter="finished">Done</button>
+                </div>
+                <div class="status-legend" aria-label="Project status colors">
+                    <span><i class="status-ring status-ring-finished"></i> Done</span>
+                    <span><i class="status-ring status-ring-new"></i> New</span>
+                    <span><i class="status-ring status-ring-working"></i> Working</span>
+                </div>
+            </div>
+            <div class="projects-grid" id="allProjectsGrid"></div>
+            <div class="empty-state" id="allProjectsEmptyState" style="display:none">
+                <div class="empty-state-icon">🗂️</div>
+                <h2>No projects in this filter</h2>
+                <p>Start a project or change the filter to see more of your work.</p>
+            </div>
+            <div class="project-fab" id="projectFab" aria-label="Create project by status" hidden>
+                <div class="project-fab-menu" id="projectFabMenu">
+                    <button class="project-fab-option status-new" data-fab-status="new">＋ New</button>
+                    <button class="project-fab-option status-working" data-fab-status="working">＋ Working</button>
+                    <button class="project-fab-option status-finished" data-fab-status="finished">＋ Done</button>
+                </div>
+                <button class="project-fab-trigger" id="projectFabTrigger" aria-label="Create project">＋</button>
+            </div>
+        </main>
+
+        <main id="progressView" class="page-view" hidden>
+            <div class="page-heading">
+                <div>
+                    <p class="eyebrow">PROJECT HEALTH</p>
+                    <h2>Progress</h2>
+                    <p class="page-description">See how your projects are distributed across each status.</p>
+                </div>
+            </div>
+            <section class="progress-card">
+                <div class="progress-ring" id="progressRing" role="img" aria-label="Project status progress">
+                    <div class="progress-ring-center">
+                        <strong id="progressTotal">0</strong>
+                        <span>Projects</span>
+                    </div>
+                </div>
+                <div class="progress-insights" id="progressInsights"></div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Add/Edit Project Modal -->
+    <div class="modal" id="addProjectModal" aria-hidden="true">
+        <div class="modal-overlay" onclick="app.closeModal('addProject')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add New Project</h2>
+                <button class="modal-close" onclick="app.closeModal('addProject')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="projectName">Project Name *</label>
+                    <input type="text" class="form-input" id="projectName" placeholder="My Awesome Project" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="projectDescription">Description</label>
+                    <textarea class="form-textarea" id="projectDescription" placeholder="Brief description of what this project does..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="projectStatus">Project Status</label>
+                    <select class="form-input" id="projectStatus">
+                        <option value="new">New</option>
+                        <option value="working">Working</option>
+                        <option value="finished">Done</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="projectPath">Folder Path *</label>
+                    <input type="text" class="form-input" id="projectPath" placeholder="C:\Users\You\Projects\MyProject" required>
+                    <span class="form-hint">Browse to auto-fill the folder name (and README, if present), then confirm/edit the full path — browsers can't read the full path for you. If a Projects Root is set, it only guesses <code>Root\FolderName</code> — add any extra subfolders yourself if the project is nested deeper.</span>
+                    <div style="margin-top:var(--space-sm);display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary" id="browsePathBtn">📂 Browse Folder</button>
+                        <input type="file" id="pathFileInput" webkitdirectory directory style="display:none">
+                        <button type="button" class="btn btn-secondary" id="verifyPathBtn">🔍 Verify Path</button>
+                    </div>
+                    <p class="form-hint path-verify-status" id="pathVerifyStatus"></p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">README Source</label>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        <button type="button" class="btn btn-secondary" id="browseReadmeBtn">📂 Browse README</button>
+                        <input type="file" id="readmeFileInput" accept=".md,.markdown,.txt" style="display:none">
+                        <button type="button" class="btn btn-secondary" id="pasteReadmeToggle">📋 Paste README</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="projectUrl">Preview URL (optional)</label>
+                    <input type="text" class="form-input" id="projectUrl" placeholder="http://localhost:3000">
+                    <span class="form-hint">If this project runs on a dev server or has a live URL, add it here — Preview will show it right inside HYDEV instead of just opening a static file.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveProjectBtn">Save Project</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteConfirmModal" aria-hidden="true">
+        <div class="modal-overlay" onclick="app.closeModal('deleteConfirm')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Delete Project</h2>
+                <button class="modal-close" onclick="app.closeModal('deleteConfirm')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="delete-warning">
+                    <span class="delete-warning-icon">⚠️</span>
+                    <span>This action cannot be undone.</span>
+                </div>
+                <p>Are you sure you want to delete <span class="project-name-delete"></span>?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelDeleteBtn">Cancel</button>
+                <button class="btn btn-danger" id="deleteConfirmBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Open Folder Modal -->
+    <div class="modal" id="openFolderModal" aria-hidden="true">
+        <div class="modal-overlay" onclick="app.closeModal('openFolder')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Open Project Folder</h2>
+                <button class="modal-close" onclick="app.closeModal('openFolder')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:var(--space-md);color:var(--text-secondary);">This project's folder:</p>
+                <div class="folder-path-display" id="openFolderPath">Loading...</div>
+                <p class="form-hint form-hint-warning" id="openFolderPathWarning" style="display:none;">⚠️ This looks like just a folder name, not a full path — edit the project to paste the full path so these buttons work.</p>
+                <div class="folder-actions">
+                    <button class="btn btn-primary" id="openExplorerBtn">📂 Open in Explorer</button>
+                    <button class="btn btn-secondary" id="openInVscodeBtn">💻 Open in VS Code</button>
+                    <button class="btn btn-secondary" id="openInAndroidBtn">🤖 Open in Android Studio</button>
+                    <button class="btn btn-secondary" id="previewBtn">🌐 Preview</button>
+                    <button class="btn btn-secondary" id="copyPathBtn">📋 Copy Path</button>
+                </div>
+                <p class="form-hint" style="margin-top:var(--space-sm);">These open the app directly when you're running HYDEV via <code>start.bat</code>. Opened another way (or the app isn't installed), they'll fall back to copying the path / a link your OS may or may not recognize. Preview just opens a static <code>index.html</code> if the project has one — it's not a dev server.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="closeOpenFolderBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paste README Modal -->
+    <div class="modal" id="pasteReadmeModal" aria-hidden="true">
+        <div class="modal-overlay" onclick="app.closeModal('pasteReadme')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Paste README Content</h2>
+                <button class="modal-close" onclick="app.closeModal('pasteReadme')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="pasteReadmeContent">README Content</label>
+                    <textarea class="form-textarea" id="pasteReadmeContent" placeholder="Paste your README.md content here...\n\nExample:\n# My Project\nThis is my awesome project that does X, Y, Z.\n" style="min-height:200px;"></textarea>
+                    <span class="form-hint">Paste the full content of your README.md file. The app will extract the first heading as the name and the first paragraph as the description.</span>
+                </div>
+                <div class="paste-preview" id="pastePreview">
+                    <div class="paste-preview-title">Preview</div>
+                    <div class="paste-preview-name" id="pastePreviewName">—</div>
+                    <div class="paste-preview-desc" id="pastePreviewDesc">—</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelPasteBtn">Cancel</button>
+                <button class="btn btn-primary" id="savePasteBtn">Use This README</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal" aria-hidden="true">
+        <div class="modal-overlay" onclick="app.closeModal('settings')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Settings</h2>
+                <button class="modal-close" onclick="app.closeModal('settings')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="projectsRootInput">Projects Root Folder</label>
+                    <input type="text" class="form-input" id="projectsRootInput" placeholder="C:\Users\You\Projects">
+                    <span class="form-hint">If your projects all live under one folder, set it here once. Browsing to add a project will then auto-fill the full path as <code>Root\FolderName</code> — browsers can't read a folder's full path on their own, so this is how you skip retyping it every time.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="closeSettingsBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveSettingsBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Overview Modal -->
+    <div class="modal" id="overviewModal" aria-hidden="true">
+        <div class="modal-overlay" onclick="app.closeModal('overview')"></div>
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <h2 class="modal-title" id="overviewTitle">Project Overview</h2>
+                <button class="modal-close" onclick="app.closeModal('overview')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="readme-content" id="overviewBody"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="closeOverviewBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Integrated Preview Modal -->
+    <div class="modal" id="previewModal" aria-hidden="true">
+        <div class="modal-overlay" onclick="app.closeModal('preview')"></div>
+        <div class="modal-content modal-content-preview">
+            <div class="modal-header">
+                <h2 class="modal-title" id="previewModalTitle">Preview</h2>
+                <div class="preview-header-actions">
+                    <button class="btn-icon" id="previewRefreshBtn" title="Refresh" aria-label="Refresh preview">🔄</button>
+                    <button class="btn-icon" id="previewOpenExternalBtn" title="Open in new window" aria-label="Open in new window">↗</button>
+                    <button class="modal-close" onclick="app.closeModal('preview')">✕</button>
+                </div>
+            </div>
+            <div class="modal-body modal-body-flush">
+                <iframe id="previewFrame" class="preview-iframe" title="Project preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+                <p class="form-hint preview-hint">If nothing loads, the site may block being shown inside another page — try "Open in new window" instead.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="closePreviewBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer style="text-align:center;padding:var(--space-xl);color:var(--text-muted);font-size:0.8rem;">
+        © HYDEV 2026 — Built for project tracking
+    </footer>
+
+    <!-- Scripts -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>

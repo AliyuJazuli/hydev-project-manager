@@ -1,0 +1,25 @@
+{
+    "name": "HYDEV Project Manager",
+    "short_name": "HYDEV PM",
+    "description": "Track and manage your local projects",
+    "start_url": "./",
+    "display": "standalone",
+    "background_color": "#0C0C0C",
+    "theme_color": "#0C0C0C",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "hydev-logo.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "hydev-logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "categories": ["productivity", "utilities", "developer"]
+}
