@@ -1,13 +1,13 @@
 /**
  * HYDEV Project Manager - Main Application
- * Version: 1.4.0
+ * Version: 1.5.0
  */
 
 import {
     STORAGE_KEY, THEME_KEY, APP_VERSION, ICONS, TOAST_DURATION,
     DEBOUNCE_MS, MAX_PATH_LENGTH, MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH,
     MAX_README_SIZE, INVALID_PATH_CHARS, WINDOWS_DRIVE_REGEX, UNIX_PATH_REGEX,
-    MODAL_IDS, ELEMENT_IDS, PROJECTS_ROOT_KEY
+    MODAL_IDS, ELEMENT_IDS, PROJECTS_ROOT_KEY, ANDROID_STUDIO_PATH_KEY, VS_CODE_PATH_KEY
 } from './constants.js';
 
 class ProjectManager {
@@ -17,6 +17,7 @@ class ProjectManager {
         this.currentIndex = -1;
         this.searchQuery = '';
         this.statusFilter = 'all';
+        this.projectSort = 'recent';
         this.currentView = 'dashboard';
         this.debounceTimer = null;
         this.modalKeydownHandlers = new Map();
@@ -26,6 +27,8 @@ class ProjectManager {
         this._openFolderIndex = -1;
         this._isSaving = false;
         this.projectsRoot = localStorage.getItem(PROJECTS_ROOT_KEY) || '';
+        this.androidStudioPath = localStorage.getItem(ANDROID_STUDIO_PATH_KEY) || '';
+        this.vscodePath = localStorage.getItem(VS_CODE_PATH_KEY) || '';
 
         this._handleSearch = this._handleSearch.bind(this);
         this._handleGridClick = this._handleGridClick.bind(this);
@@ -38,6 +41,10 @@ class ProjectManager {
         const counts = { finished: 0, new: 0, working: 0 };
         this.projects.forEach(project => counts[this._getProjectStatus(project)]++);
         const total = this.projects.length;
+        this._elements.summaryTotal.textContent = total;
+        this._elements.summaryWorking.textContent = counts.working;
+        this._elements.summaryNew.textContent = counts.new;
+        this._elements.summaryFinished.textContent = counts.finished;
         const finished = total ? (counts.finished / total) * 100 : 0;
         const started = total ? (counts.new / total) * 100 : 0;
         const finishedEnd = finished;
@@ -49,7 +56,7 @@ class ProjectManager {
             : 'conic-gradient(var(--border-color) 0 100%)';
         this._elements.progressRing.style.setProperty('--progress-total', `${total}`);
         this._elements.progressTotal.textContent = total;
-        const labels = { finished: 'Done', new: 'New', working: 'Working' };
+        const labels = { finished: 'Completed', new: 'New', working: 'In progress' };
         const orderedStatuses = Object.entries(counts).sort(([, a], [, b]) => b - a);
         const insight = total === 0
             ? 'Add a project to start building your progress picture.'
@@ -74,6 +81,7 @@ class ProjectManager {
         this._loadTheme();
         this.loadProjects();
         this.updateUI();
+        this._refreshMissingProjectTypes();
         await this._initPWA();
         this._setupKeyboardShortcuts();
         this._checkLocalServer();
@@ -83,7 +91,6 @@ class ProjectManager {
     _cacheElements() {
         const get = id => document.getElementById(id);
         this._elements = {
-            addProjectBtn: get(ELEMENT_IDS.addProjectBtn),
             homeAddProjectBtn: get(ELEMENT_IDS.homeAddProjectBtn),
             emptyAddProjectBtn: get(ELEMENT_IDS.emptyAddProjectBtn),
             allProjectsBtn: get(ELEMENT_IDS.allProjectsBtn),
@@ -103,10 +110,12 @@ class ProjectManager {
             progressRing: get(ELEMENT_IDS.progressRing),
             progressTotal: get(ELEMENT_IDS.progressTotal),
             progressInsights: get(ELEMENT_IDS.progressInsights),
-            projectFab: get(ELEMENT_IDS.projectFab),
-            projectFabTrigger: get(ELEMENT_IDS.projectFabTrigger),
-            projectFabMenu: get(ELEMENT_IDS.projectFabMenu),
             startProjectBtn: get('startProjectBtn'),
+            projectSort: get('projectSort'),
+            summaryTotal: get('summaryTotal'),
+            summaryWorking: get('summaryWorking'),
+            summaryNew: get('summaryNew'),
+            summaryFinished: get('summaryFinished'),
             projectStatus: get(ELEMENT_IDS.projectStatus),
             exportBtn: get(ELEMENT_IDS.exportBtn),
             importBtn: get(ELEMENT_IDS.importBtn),
@@ -149,6 +158,8 @@ class ProjectManager {
             pathVerifyStatus: get(ELEMENT_IDS.pathVerifyStatus),
             settingsBtn: get(ELEMENT_IDS.settingsBtn),
             projectsRootInput: get(ELEMENT_IDS.projectsRootInput),
+            androidStudioInput: get(ELEMENT_IDS.androidStudioInput),
+            vscodeInput: get(ELEMENT_IDS.vscodeInput),
             saveSettingsBtn: get(ELEMENT_IDS.saveSettingsBtn),
             closeSettingsBtn: get(ELEMENT_IDS.closeSettingsBtn),
             overviewTitle: get(ELEMENT_IDS.overviewTitle),
@@ -160,18 +171,23 @@ class ProjectManager {
             previewOpenExternalBtn: get(ELEMENT_IDS.previewOpenExternalBtn),
             closePreviewBtn: get(ELEMENT_IDS.closePreviewBtn)
         };
-        this._fabPosition = { x: null, y: null };
     }
 
     _bindEvents() {
-        this._elements.addProjectBtn.addEventListener('click', () => this._openAddProjectModal());
         this._elements.homeAddProjectBtn.addEventListener('click', () => this._openAddProjectModal());
         this._elements.emptyAddProjectBtn.addEventListener('click', () => this._openAddProjectModal());
         this._elements.allProjectsBtn.addEventListener('click', () => this._switchView('projects'));
         this._elements.dashboardNavBtn.addEventListener('click', () => this._switchView('dashboard'));
         this._elements.projectsNavBtn.addEventListener('click', () => this._switchView('projects'));
         this._elements.progressNavBtn.addEventListener('click', () => this._switchView('progress'));
-        this._elements.startProjectBtn.addEventListener('click', () => this._openAddProjectModal(true));
+        document.querySelectorAll('[data-view-target]').forEach(button => {
+            button.addEventListener('click', () => this._switchView(button.dataset.viewTarget));
+        });
+        this._elements.projectSort.addEventListener('change', e => {
+            this.projectSort = e.target.value;
+            this.updateUI();
+        });
+        this._elements.startProjectBtn.addEventListener('click', () => this._openAddProjectModal('new'));
         this._elements.exportBtn.addEventListener('click', () => this.exportProjects());
         this._elements.importBtn.addEventListener('click', () => this._elements.importFile.click());
         this._elements.importFile.addEventListener('change', e => this._handleImport(e));
@@ -182,20 +198,14 @@ class ProjectManager {
         this._elements.allProjectsGrid.addEventListener('click', this._handleGridClick);
         [this._elements.allProjectsGrid]
             .forEach(grid => grid.addEventListener('change', e => this._handleStatusChange(e)));
-        this._elements.projectFabTrigger.addEventListener('click', () => {
-            this._elements.projectFab.classList.toggle('open');
-        });
-        this._elements.projectFabMenu.addEventListener('click', e => {
-            const option = e.target.closest('[data-fab-status]');
-            if (!option) return;
-            this._elements.projectFab.classList.remove('open');
-            this._openAddProjectModal(option.dataset.fabStatus);
-        });
-        this._makeFabDraggable();
         document.querySelectorAll('[data-status-filter]').forEach(button => {
             button.addEventListener('click', () => {
                 this.statusFilter = button.dataset.statusFilter;
-                document.querySelectorAll('[data-status-filter]').forEach(item => item.classList.toggle('active', item.dataset.statusFilter === this.statusFilter));
+                document.querySelectorAll('[data-status-filter]').forEach(item => {
+                    const active = item.dataset.statusFilter === this.statusFilter;
+                    item.classList.toggle('active', active);
+                    item.setAttribute('aria-pressed', String(active));
+                });
                 this.updateUI();
             });
         });
@@ -292,6 +302,7 @@ class ProjectManager {
         if (e.key === STORAGE_KEY) {
             this.loadProjects();
             this.updateUI();
+            this._refreshMissingProjectTypes();
             this.showToast('Projects updated from another tab.', 'info');
         }
     }
@@ -301,11 +312,11 @@ class ProjectManager {
         const filtered = this._getFilteredProjects();
         const pinned = filtered.filter(project => project.pinned)
             .sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0));
-        const latest = filtered.filter(project => !project.pinned)
-            .sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0))
-            .slice(0, 6);
         const recent = filtered.filter(project => !project.pinned && project.lastOpened)
             .sort((a, b) => new Date(b.lastOpened) - new Date(a.lastOpened))
+            .slice(0, 6);
+        const latest = recent.length ? [] : filtered.filter(project => !project.pinned)
+            .sort((a, b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0))
             .slice(0, 6);
         this._renderProjects(pinned, this._elements.pinnedProjectsGrid);
         this._renderProjects(latest, this._elements.projectsGrid);
@@ -315,7 +326,7 @@ class ProjectManager {
         this._elements.recentSection.hidden = recent.length === 0;
         const statusProjects = this._getStatusFilteredProjects();
         this._renderProjects(statusProjects, this._elements.allProjectsGrid);
-        this._updateProjectCount(filtered.length);
+        this._updateProjectCount(this.currentView === 'projects' ? statusProjects.length : filtered.length);
         this._updateEmptyState(filtered.length);
         this._updateProjectsPageEmptyState(statusProjects.length);
         this._updateProgress();
@@ -323,19 +334,25 @@ class ProjectManager {
 
     _getFilteredProjects() {
         const list = !this.searchQuery.trim() ? [...this.projects] : this.projects.filter(p =>
-            p.name.toLowerCase().includes(this.searchQuery.toLowerCase()) || (p.description || '').toLowerCase().includes(this.searchQuery.toLowerCase())
+            [p.name, p.description, p.path, p.projectType]
+                .some(value => String(value || '').toLowerCase().includes(this.searchQuery.toLowerCase()))
         );
-        const statusFiltered = this.statusFilter === 'all'
-            ? list
-            : list.filter(project => this._getProjectStatus(project) === this.statusFilter);
-        return statusFiltered.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+        return list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
     }
 
     _getStatusFilteredProjects() {
-        const list = this.statusFilter === 'all'
-            ? [...this.projects]
-            : this.projects.filter(project => this._getProjectStatus(project) === this.statusFilter);
-        return list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+        const query = this.searchQuery.trim().toLowerCase();
+        const list = this.projects.filter(project =>
+            (this.statusFilter === 'all' || this._getProjectStatus(project) === this.statusFilter) &&
+            (!query || [project.name, project.description, project.path, project.projectType]
+                .some(value => String(value || '').toLowerCase().includes(query)))
+        );
+        return list.sort((a, b) => {
+            if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+            if (this.projectSort === 'name') return a.name.localeCompare(b.name);
+            if (this.projectSort === 'opened') return new Date(b.lastOpened || 0) - new Date(a.lastOpened || 0);
+            return new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0);
+        });
     }
 
     _getProjectStatus(project) {
@@ -352,7 +369,8 @@ class ProjectManager {
             const pinned = !!project.pinned;
             const path = project.path || '';
             const status = this._getProjectStatus(project);
-            const statusLabel = { new: 'New', working: 'Working', finished: 'Done' }[status];
+            const statusLabel = { new: 'New', working: 'In progress', finished: 'Completed' }[status];
+            const projectType = project.projectType || 'Unknown';
 
             return `
                 <div class="project-card status-${status}${pinned ? ' pinned' : ''}" data-id="${this._escapeHtml(project.id)}" data-index="${actualIndex}">
@@ -360,12 +378,18 @@ class ProjectManager {
                         <div class="card-title-row"><i class="status-ring status-ring-${status}" title="${statusLabel}"></i><h3 class="card-title">${this._escapeHtml(project.name)}</h3></div>
                         <div class="card-actions">
                             <button class="btn-icon btn-icon-pin${pinned ? ' active' : ''}" data-action="pin" data-index="${actualIndex}" aria-label="${pinned ? 'Unpin project' : 'Pin project'}" title="${pinned ? 'Unpin' : 'Pin'}">${ICONS.pin}</button>
-                            <button class="btn-icon" data-action="moveUp" data-index="${actualIndex}" aria-label="Move up" title="Move up">${ICONS.moveUp}</button>
-                            <button class="btn-icon" data-action="moveDown" data-index="${actualIndex}" aria-label="Move down" title="Move down">${ICONS.moveDown}</button>
                             <button class="btn-icon" data-action="edit" data-index="${actualIndex}" aria-label="Edit project" title="Edit">${ICONS.edit}</button>
-                            <button class="btn-icon btn-icon-danger" data-action="delete" data-index="${actualIndex}" aria-label="Delete project" title="Delete">${ICONS.delete}</button>
+                            <details class="card-more-actions">
+                                <summary class="btn-icon" aria-label="More project actions" title="More actions">···</summary>
+                                <div class="card-actions-menu">
+                                    <button type="button" data-action="moveUp" data-index="${actualIndex}">${ICONS.moveUp} Move up</button>
+                                    <button type="button" data-action="moveDown" data-index="${actualIndex}">${ICONS.moveDown} Move down</button>
+                                    <button type="button" class="danger-action" data-action="delete" data-index="${actualIndex}">${ICONS.delete} Delete</button>
+                                </div>
+                            </details>
                         </div>
                     </div>
+                    <span class="project-type-badge">${this._escapeHtml(projectType)}</span>
                     <p class="card-description">${this._escapeHtml(project.description || 'No description')}</p>
                     ${path ? `<div class="card-path" title="${this._escapeHtml(path)}">${ICONS.folder} <span>${this._escapeHtml(path)}</span></div>` : ''}
                     <div class="card-footer">
@@ -376,8 +400,8 @@ class ProjectManager {
                             </button>
                             <select class="status-select status-select-${status}" data-index="${actualIndex}" aria-label="Change project status">
                                 <option value="new" ${status === 'new' ? 'selected' : ''}>New</option>
-                                <option value="working" ${status === 'working' ? 'selected' : ''}>Working</option>
-                                <option value="finished" ${status === 'finished' ? 'selected' : ''}>Done</option>
+                                <option value="working" ${status === 'working' ? 'selected' : ''}>In progress</option>
+                                <option value="finished" ${status === 'finished' ? 'selected' : ''}>Completed</option>
                             </select>
                             <button class="btn btn-sm btn-primary" data-action="openFolder" data-index="${actualIndex}" aria-label="Open folder" title="Open folder">
                                 ${ICONS.folder} Open
@@ -395,6 +419,15 @@ class ProjectManager {
         if (count === 0) {
             empty.style.display = 'flex';
             grid.innerHTML = '';
+            const title = empty.querySelector('h2');
+            const description = empty.querySelector('p:not(.eyebrow)');
+            if (this.projects.length === 0) {
+                title.textContent = 'Your library is empty';
+                description.textContent = 'Add a local project folder to start your workspace.';
+            } else {
+                title.textContent = 'No matching projects';
+                description.textContent = 'Try a different search or status filter.';
+            }
         } else {
             empty.style.display = 'none';
         }
@@ -411,15 +444,18 @@ class ProjectManager {
         this._elements.dashboardNavBtn.classList.toggle('active', !isProjects && !isProgress);
         this._elements.projectsNavBtn.classList.toggle('active', isProjects);
         this._elements.progressNavBtn.classList.toggle('active', isProgress);
-        this._elements.projectFab.hidden = !isProjects;
+        this._elements.dashboardNavBtn.setAttribute('aria-current', !isProjects && !isProgress ? 'page' : 'false');
+        this._elements.projectsNavBtn.setAttribute('aria-current', isProjects ? 'page' : 'false');
+        this._elements.progressNavBtn.setAttribute('aria-current', isProgress ? 'page' : 'false');
+        this._updateProjectCount(isProjects ? this._getStatusFilteredProjects().length : this._getFilteredProjects().length);
     }
 
     _updateProjectCount(count) {
         if (!this._elements.projectCount) return;
         const total = this.projects.length;
-        const text = total === 0 ? 'No projects' :
-            count === total ? `${total} project${total !== 1 ? 's' : ''}` :
-            `${count} of ${total} projects`;
+        const text = total === 0 ? '0 projects' :
+            count === total ? `${total} ${total === 1 ? 'project' : 'projects'}` :
+            `${count} of ${total}`;
         this._elements.projectCount.textContent = text;
     }
 
@@ -429,10 +465,16 @@ class ProjectManager {
 
         if (this.projects.length === 0) {
             empty.style.display = 'flex';
+            empty.querySelector('h2').textContent = 'No projects yet';
+            empty.querySelector('p:not(.eyebrow)').textContent = 'Add a local project folder to make this workspace yours.';
+            this._elements.emptyAddProjectBtn.hidden = false;
             grid.innerHTML = '';
         } else if (count === 0) {
-            empty.style.display = 'none';
-            grid.innerHTML = '<div class="no-results"><p>No projects match your search.</p></div>';
+            empty.style.display = 'flex';
+            empty.querySelector('h2').textContent = 'No matching projects';
+            empty.querySelector('p:not(.eyebrow)').textContent = 'Try another search, or browse your full project library.';
+            this._elements.emptyAddProjectBtn.hidden = true;
+            grid.innerHTML = '';
         } else {
             empty.style.display = 'none';
         }
@@ -443,7 +485,10 @@ class ProjectManager {
         this.searchQuery = e.target.value;
         this._elements.clearSearchBtn.style.display = this.searchQuery ? 'block' : 'none';
         clearTimeout(this.debounceTimer);
-        this.debounceTimer = setTimeout(() => this.updateUI(), DEBOUNCE_MS);
+        this.debounceTimer = setTimeout(() => {
+            this.updateUI();
+            if (this.searchQuery.trim()) this._switchView('projects');
+        }, DEBOUNCE_MS);
     }
 
     _clearSearch() {
@@ -491,7 +536,8 @@ class ProjectManager {
         this.projects[index].status = status;
         this.saveProjects();
         this.updateUI();
-        this.showToast(`"${this.projects[index].name}" marked ${status === 'new' ? 'new' : status === 'finished' ? 'done' : 'working'}.`, 'success');
+        const statusLabel = { new: 'new', working: 'in progress', finished: 'completed' }[status];
+        this.showToast(`"${this.projects[index].name}" marked ${statusLabel}.`, 'success');
     }
 
     // ==================== PROJECT CRUD ====================
@@ -525,7 +571,7 @@ class ProjectManager {
         this._elements.projectName.focus();
     }
 
-    saveProject() {
+    async saveProject() {
         if (this._isSaving) return;
         this._isSaving = true;
         this._elements.saveProjectBtn.disabled = true;
@@ -542,9 +588,9 @@ class ProjectManager {
         if (!name) { finishSaveAttempt(); this.showToast('Project name is required.', 'error'); this._elements.projectName.focus(); return; }
         if (!path) { finishSaveAttempt(); this.showToast('Folder path is required.', 'error'); this._elements.projectPath.focus(); return; }
         if (INVALID_PATH_CHARS.test(path)) { finishSaveAttempt(); this.showToast('Path contains invalid characters: < > | " ? *', 'error'); this._elements.projectPath.focus(); return; }
-        const normalizedPath = this._normalizeProjectPath(path);
+        const normalizedPath = this._normalizeProjectPath(this._resolveProjectPath(path));
         const duplicate = this.projects.find((project, index) =>
-            index !== this.currentIndex && this._normalizeProjectPath(project.path) === normalizedPath
+            index !== this.currentIndex && this._normalizeProjectPath(this._resolveProjectPath(project.path)) === normalizedPath
         );
         if (duplicate) {
             finishSaveAttempt();
@@ -556,16 +602,19 @@ class ProjectManager {
         const truncatedName = name.slice(0, MAX_NAME_LENGTH);
         const truncatedDesc = description.slice(0, MAX_DESCRIPTION_LENGTH);
         const readme = (this._pendingReadme || '').slice(0, MAX_README_SIZE);
+        const resolvedPath = this._resolveProjectPath(path);
+        const detectedType = await this._detectProjectType(resolvedPath);
 
         if (this.currentIndex >= 0) {
             // EDIT MODE - Update existing
             this.projects[this.currentIndex] = {
                 ...this.projects[this.currentIndex],
                 name: truncatedName,
-                path: path,
+                path: resolvedPath,
                 description: truncatedDesc,
                 url,
                 readme,
+                projectType: detectedType || this.projects[this.currentIndex].projectType || 'Unknown',
                 status
             };
             this.showToast('Project updated successfully!', 'success');
@@ -574,12 +623,13 @@ class ProjectManager {
             const newProject = {
                 id: this._generateId(),
                 name: truncatedName,
-                path: path,
+                path: resolvedPath,
                 description: truncatedDesc,
                 dateAdded: new Date().toISOString(),
                 pinned: false,
                 url,
                 readme,
+                projectType: detectedType || 'Unknown',
                 status
             };
             this.projects.unshift(newProject);
@@ -590,6 +640,9 @@ class ProjectManager {
         this.saveProjects();
         this.updateUI();
         this.closeModal('addProject');
+        if (!detectedType) {
+            this.showToast('Project saved, but its type could not be detected. Run via start.bat to enable local detection.', 'info');
+        }
         finishSaveAttempt();
     }
 
@@ -680,12 +733,59 @@ class ProjectManager {
     // launch the app. Returns { available: false } if that server isn't the
     // one serving this page (e.g. it was opened via a different static
     // host) — the caller then falls back to a browser URI scheme instead.
+    _getToolExecutable(tool) {
+        if (tool === 'android-studio') return this.androidStudioPath.trim() || null;
+        if (tool === 'vscode') return this.vscodePath.trim() || null;
+        return null;
+    }
+
+    async _detectProjectType(path) {
+        try {
+            const response = await fetch('/api/project-type', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path })
+            });
+            if (!response.ok) {
+                const data = await response.json();
+                console.error('Project type detection failed:', data.error || response.statusText);
+                return null;
+            }
+            const data = await response.json();
+            return typeof data.type === 'string' ? data.type : null;
+        } catch (error) {
+            console.warn('Project type detection is unavailable:', error);
+            return null;
+        }
+    }
+
+    async _refreshMissingProjectTypes() {
+        const missing = this.projects.filter(project => !project.projectType || project.projectType === 'Unknown');
+        if (missing.length === 0) return;
+
+        const detected = await Promise.all(missing.map(async project => ({
+            project,
+            type: await this._detectProjectType(project.path)
+        })));
+        let changed = false;
+        detected.forEach(({ project, type }) => {
+            if (type && this.projects.includes(project)) {
+                project.projectType = type;
+                changed = true;
+            }
+        });
+        if (changed) {
+            this.saveProjects();
+            this.updateUI();
+        }
+    }
+
     async _callLocalOpenApi(tool, targetPath) {
         try {
             const res = await fetch('/api/open', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tool, path: targetPath })
+                body: JSON.stringify({ tool, path: targetPath, executable: this._getToolExecutable(tool) })
             });
             const data = await res.json().catch(() => ({}));
             return { available: true, ok: !!data.ok, error: data.error };
@@ -797,17 +897,30 @@ class ProjectManager {
     // ==================== SETTINGS ====================
     _openSettings() {
         this._elements.projectsRootInput.value = this.projectsRoot;
+        this._elements.androidStudioInput.value = this.androidStudioPath;
+        this._elements.vscodeInput.value = this.vscodePath;
         this._openModal('settings');
         this._elements.projectsRootInput.focus();
     }
 
     _saveSettings() {
         const root = this._elements.projectsRootInput.value.trim();
+        const androidStudio = this._elements.androidStudioInput.value.trim();
+        const vscode = this._elements.vscodeInput.value.trim();
+
         this.projectsRoot = root;
+        this.androidStudioPath = androidStudio;
+        this.vscodePath = vscode;
+
         if (root) localStorage.setItem(PROJECTS_ROOT_KEY, root);
         else localStorage.removeItem(PROJECTS_ROOT_KEY);
+        if (androidStudio) localStorage.setItem(ANDROID_STUDIO_PATH_KEY, androidStudio);
+        else localStorage.removeItem(ANDROID_STUDIO_PATH_KEY);
+        if (vscode) localStorage.setItem(VS_CODE_PATH_KEY, vscode);
+        else localStorage.removeItem(VS_CODE_PATH_KEY);
+
         this.closeModal('settings');
-        this.showToast(root ? 'Projects Root saved.' : 'Projects Root cleared.', 'success');
+        this.showToast('Settings saved.', 'success');
     }
 
     // ==================== PROJECT OVERVIEW ====================
@@ -940,13 +1053,36 @@ class ProjectManager {
     // Note: this only ever guesses Root\FolderName — if the real project is
     // nested deeper (Root\Category\FolderName), the guess will be wrong and
     // needs manual correction. That's what Verify Path is for.
+    _looksLikeAbsolutePath(value) {
+        return WINDOWS_DRIVE_REGEX.test(value) || UNIX_PATH_REGEX.test(value) || /^\\\\/.test(value);
+    }
+
     _buildProjectPath(folderName) {
+        const rawName = String(folderName || '').trim();
+        if (!rawName) return '';
+        if (this._looksLikeAbsolutePath(rawName)) return rawName;
+
         const root = this.projectsRoot.trim();
-        if (!root) return folderName;
-        const usesBackslash = root.includes('\\') && !root.includes('/');
-        const sep = usesBackslash ? '\\' : '/';
+        if (!root) return rawName;
+
+        const cleanedName = rawName.replace(/^[\\/]+/, '').replace(/[\\/]+$/, '');
         const trimmedRoot = root.replace(/[\\/]+$/, '');
-        return `${trimmedRoot}${sep}${folderName}`;
+        const separator = trimmedRoot.includes('\\') ? '\\' : '/';
+        return `${trimmedRoot}${separator}${cleanedName}`;
+    }
+
+    _resolveProjectPath(pathValue) {
+        const raw = String(pathValue || '').trim();
+        if (!raw) return '';
+        if (this._looksLikeAbsolutePath(raw)) return raw.replace(/[\\/]+$/, '');
+
+        const root = this.projectsRoot.trim();
+        if (!root) return raw.replace(/[\\/]+$/, '');
+
+        const trimmedRoot = root.replace(/[\\/]+$/, '');
+        const cleanedRaw = raw.replace(/^[\\/]+/, '').replace(/[\\/]+$/, '');
+        const separator = trimmedRoot.includes('\\') ? '\\' : '/';
+        return `${trimmedRoot}${separator}${cleanedRaw}`;
     }
 
     _clearPathVerifyStatus() {
@@ -1116,6 +1252,7 @@ class ProjectManager {
                     pinned: p.pinned === true,
                     url: String(p.url || '').slice(0, MAX_PATH_LENGTH),
                     readme: String(p.readme || '').slice(0, MAX_README_SIZE),
+                    projectType: String(p.projectType || '').slice(0, 50) || undefined,
                     status: ['new', 'working', 'finished'].includes(p.status) ? p.status : 'working'
                 });
             }
@@ -1125,6 +1262,7 @@ class ProjectManager {
             this.projects = [...sanitized, ...this.projects];
             this.saveProjects();
             this.updateUI();
+            this._refreshMissingProjectTypes();
             const skippedText = skipped > 0 ? ` (${skipped} duplicate${skipped !== 1 ? 's' : ''} skipped)` : '';
             this.showToast(`Imported ${sanitized.length} project${sanitized.length !== 1 ? 's' : ''}!${skippedText}`, 'success');
         } catch (error) {
@@ -1298,42 +1436,6 @@ class ProjectManager {
             toast.classList.remove('toast-show');
             setTimeout(() => toast.remove(), 300);
         }, duration);
-    }
-
-    _makeFabDraggable() {
-        const fab = this._elements.projectFab;
-        let dragging = false;
-        let moved = false;
-        let offsetX = 0;
-        let offsetY = 0;
-
-        fab.addEventListener('pointerdown', event => {
-            if (event.target.closest('.project-fab-option')) return;
-            dragging = true;
-            moved = false;
-            const rect = fab.getBoundingClientRect();
-            offsetX = event.clientX - rect.left;
-            offsetY = event.clientY - rect.top;
-            fab.setPointerCapture(event.pointerId);
-            fab.classList.add('dragging');
-        });
-        fab.addEventListener('pointermove', event => {
-            if (!dragging) return;
-            moved = true;
-            const maxX = window.innerWidth - fab.offsetWidth - 12;
-            const maxY = window.innerHeight - fab.offsetHeight - 12;
-            fab.style.left = `${Math.min(maxX, Math.max(12, event.clientX - offsetX))}px`;
-            fab.style.top = `${Math.min(maxY, Math.max(12, event.clientY - offsetY))}px`;
-            fab.style.right = 'auto';
-            fab.style.bottom = 'auto';
-        });
-        fab.addEventListener('pointerup', event => {
-            if (!dragging) return;
-            dragging = false;
-            fab.releasePointerCapture(event.pointerId);
-            fab.classList.remove('dragging');
-            if (moved) event.preventDefault();
-        });
     }
 
     // ==================== UTILITIES ====================

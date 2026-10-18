@@ -6,7 +6,7 @@
  * version suffix / CACHE_NAME in constants.js.
  */
 
-const CACHE_NAME = 'hydev-pm-v6';
+const CACHE_NAME = 'hydev-pm-v7';
 
 const PRECACHE_URLS = [
     './',

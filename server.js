@@ -151,7 +151,8 @@ function getWindowsStandardPaths() {
     return { userProfile, localAppData, programFiles, programFilesX86 };
 }
 
-function openVSCode(targetPath) {
+function openVSCode(targetPath, customExecutable = null) {
+    if (customExecutable) return trySpawn([customExecutable], [targetPath]);
     if (process.platform === 'win32') {
         const { localAppData, programFiles, programFilesX86 } = getWindowsStandardPaths();
         const candidates = [
@@ -173,7 +174,8 @@ function openVSCode(targetPath) {
     return trySpawn(['code'], [targetPath]);
 }
 
-function openAndroidStudio(targetPath) {
+function openAndroidStudio(targetPath, customExecutable = null) {
+    if (customExecutable) return trySpawn([customExecutable], [targetPath]);
     if (process.platform === 'win32') {
         const { userProfile, localAppData, programFiles, programFilesX86 } = getWindowsStandardPaths();
         const candidates = [
@@ -252,7 +254,7 @@ function handleOpen(req, res) {
             return;
         }
 
-        const { tool, path: targetPath } = parsed || {};
+        const { tool, path: targetPath, executable } = parsed || {};
         const opener = OPENERS[tool];
         if (!opener) {
             sendJson(res, 400, { ok: false, error: `Unknown tool "${tool}".` });
@@ -278,7 +280,7 @@ function handleOpen(req, res) {
         }
 
         try {
-            await opener(targetPath.trim());
+            await opener(targetPath.trim(), executable && typeof executable === 'string' ? executable.trim() : null);
             sendJson(res, 200, { ok: true });
         } catch (err) {
             const message = tool === 'preview-web'
@@ -308,6 +310,91 @@ function handleVerifyPath(req, res) {
         sendJson(res, 200, diag.exists
             ? { exists: true, message: 'Found — this folder exists.' }
             : { exists: false, message: describeDiagnosis(targetPath, diag) });
+    });
+}
+
+function detectProjectType(targetPath) {
+    const entries = new Set(fs.readdirSync(targetPath));
+    const has = (...names) => names.some(name => entries.has(name));
+    const packageJsonPath = path.join(targetPath, 'package.json');
+    let packageData = {};
+
+    if (entries.has('package.json')) {
+        try {
+            const parsedPackage = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+            if (parsedPackage && typeof parsedPackage === 'object' && !Array.isArray(parsedPackage)) {
+                packageData = parsedPackage;
+            }
+        } catch (error) {
+            if (!(error instanceof SyntaxError)) throw error;
+        }
+    }
+
+    const dependencies = {
+        ...(packageData.dependencies || {}),
+        ...(packageData.devDependencies || {}),
+        ...(packageData.peerDependencies || {})
+    };
+
+    const androidBuildFiles = [
+        'build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts',
+        path.join('app', 'build.gradle'), path.join('app', 'build.gradle.kts')
+    ];
+    const hasAndroidManifest = entries.has('AndroidManifest.xml') || [
+        path.join('app', 'src', 'main', 'AndroidManifest.xml'),
+        path.join('src', 'main', 'AndroidManifest.xml')
+    ].some(file => fs.existsSync(path.join(targetPath, file)));
+    const hasAndroidPlugin = androidBuildFiles
+        .filter(file => fs.existsSync(path.join(targetPath, file)))
+        .map(file => fs.readFileSync(path.join(targetPath, file), 'utf8'))
+        .some(contents => /com\.android\.(application|library)|android[.-](application|library)/.test(contents));
+
+    if (hasAndroidManifest || hasAndroidPlugin) return 'Android';
+    if (dependencies.next) return 'Next.js';
+    if (dependencies.react) return 'React';
+    if (dependencies.vue) return 'Vue';
+    if (dependencies['@angular/core']) return 'Angular';
+    if (dependencies.svelte) return 'Svelte';
+    if (entries.has('package.json')) return 'Node.js';
+    if (has('pyproject.toml', 'requirements.txt', 'Pipfile', 'setup.py')) return 'Python';
+    if (entries.has('Cargo.toml')) return 'Rust';
+    if (entries.has('go.mod')) return 'Go';
+    if ([...entries].some(name => /\.(csproj|sln)$/i.test(name))) return '.NET';
+    if (entries.has('composer.json')) return 'PHP';
+    if (entries.has('Gemfile')) return 'Ruby';
+    if (has('pom.xml', 'build.gradle', 'build.gradle.kts')) return 'Java';
+    if (entries.has('index.html')) return 'Web';
+    return 'Other';
+}
+
+function handleProjectType(req, res) {
+    let body = '';
+    req.on('data', (chunk) => {
+        body += chunk;
+        if (body.length > 10_000) req.destroy();
+    });
+    req.on('end', () => {
+        let parsed;
+        try {
+            parsed = JSON.parse(body);
+        } catch {
+            sendJson(res, 400, { error: 'Malformed request.' });
+            return;
+        }
+
+        const targetPath = parsed && typeof parsed.path === 'string' ? parsed.path.trim() : '';
+        const diagnosis = diagnosePath(targetPath);
+        if (!diagnosis.exists) {
+            sendJson(res, 400, { error: describeDiagnosis(targetPath, diagnosis) });
+            return;
+        }
+
+        try {
+            sendJson(res, 200, { type: detectProjectType(targetPath) });
+        } catch (error) {
+            console.error(`Failed to detect project type in "${targetPath}":`, error);
+            sendJson(res, 500, { error: 'Could not inspect this project folder.' });
+        }
     });
 }
 
@@ -345,6 +432,10 @@ const server = http.createServer((req, res) => {
     }
     if (req.method === 'POST' && req.url === '/api/verify-path') {
         handleVerifyPath(req, res);
+        return;
+    }
+    if (req.method === 'POST' && req.url === '/api/project-type') {
+        handleProjectType(req, res);
         return;
     }
     if (req.method === 'GET') {

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="HYDEV Project Manager - Track and manage your projects">
     <meta name="theme-color" content="#0C0C0C">
-    <title> HYDEV Project Manager</title>
+    <title>HYDEV Project Manager</title>
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -22,127 +22,148 @@
         <!-- Header -->
         <header class="header">
             <div class="logo-section">
-                <img src="hydev-logo.png" alt="HYDEV" class="logo-wordmark">
+                <img src="hydev-logo.png" alt="" class="logo-wordmark">
                 <h1 class="app-title">HYDEV Project Manager</h1>
             </div>
             <div class="header-actions">
-                <button class="btn btn-secondary" id="exportBtn" title="Export projects">📤 Export</button>
-                <button class="btn btn-secondary" id="importBtn" title="Import projects">📥 Import</button>
+                <button class="btn btn-secondary" id="exportBtn" title="Export projects"><span aria-hidden="true">↗</span><span>Export</span></button>
+                <button class="btn btn-secondary" id="importBtn" title="Import projects"><span aria-hidden="true">↙</span><span>Import</span></button>
                 <input type="file" id="importFile" accept=".json" style="display:none">
-                <button class="theme-toggle" id="settingsBtn" title="Settings">
-                    <span>⚙️</span>
+                <button class="theme-toggle" id="settingsBtn" title="Settings" aria-label="Settings">
+                    <span aria-hidden="true">⚙</span>
                 </button>
-                <button class="theme-toggle" id="themeToggle" title="Toggle theme">
-                    <span id="themeIcon">🌙</span>
+                <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+                    <span id="themeIcon" aria-hidden="true">☾</span>
                 </button>
             </div>
         </header>
 
         <!-- Page navigation -->
         <nav class="page-nav" aria-label="Project pages">
-            <button class="page-nav-link active" id="dashboardNavBtn" data-view="dashboard">Home</button>
-            <button class="page-nav-link" id="projectsNavBtn" data-view="projects">All Projects</button>
-            <button class="page-nav-link" id="progressNavBtn" data-view="progress">Progress</button>
+            <button class="page-nav-link active" id="dashboardNavBtn" data-view="dashboard" aria-current="page">Home</button>
+            <button class="page-nav-link" id="projectsNavBtn" data-view="projects">Projects</button>
+            <button class="page-nav-link" id="progressNavBtn" data-view="progress">Insights</button>
         </nav>
+
+        <div class="workspace-toolbar">
+            <div class="search-container">
+                <span class="search-icon" aria-hidden="true">⌕</span>
+                <input type="search" class="search-input" id="searchInput" placeholder="Search projects by name, description, or type…" aria-label="Search projects" autocomplete="off">
+                <kbd class="search-shortcut" aria-hidden="true">Ctrl K</kbd>
+                <button class="clear-search-btn" id="clearSearchBtn" title="Clear search" aria-label="Clear search" style="display:none">×</button>
+            </div>
+            <span class="project-count" id="projectCount" aria-live="polite"></span>
+        </div>
 
         <main id="dashboardView" class="page-view active">
             <div class="page-heading home-heading">
                 <div>
-                    <p class="eyebrow">YOUR WORKSPACE</p>
-                    <h2>My Projects</h2>
-                    <p class="page-description">A focused view of your workspace.</p>
+                    <p class="eyebrow">YOUR LOCAL WORKSPACE</p>
+                    <h2>Good to see you.</h2>
+                    <p class="page-description">Pick up where you left off or start something new.</p>
                 </div>
-                <button class="btn btn-primary" id="homeAddProjectBtn">＋ New Project</button>
+                <button class="btn btn-primary" id="homeAddProjectBtn"><span aria-hidden="true">＋</span> Add a project</button>
             </div>
-            <!-- Toolbar -->
-            <div class="toolbar">
-                <div class="search-container">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" class="search-input" id="searchInput" placeholder="Search projects... (Ctrl+K or /)">
-                    <button class="clear-search-btn" id="clearSearchBtn" title="Clear search" aria-label="Clear search" style="display:none">✕</button>
+            <section class="workspace-summary" aria-label="Project summary">
+                <div class="summary-card summary-total">
+                    <span class="summary-label">Total projects</span>
+                    <strong id="summaryTotal">0</strong>
+                    <span class="summary-detail">in your workspace</span>
                 </div>
-                <button class="btn btn-primary" id="addProjectBtn">➕ Add Project</button>
-                <button class="btn btn-secondary" id="allProjectsBtn">All Projects →</button>
-            </div>
+                <div class="summary-card">
+                    <span class="summary-label"><i class="status-ring status-ring-working"></i> In progress</span>
+                    <strong id="summaryWorking">0</strong>
+                    <span class="summary-detail">active projects</span>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-label"><i class="status-ring status-ring-new"></i> Up next</span>
+                    <strong id="summaryNew">0</strong>
+                    <span class="summary-detail">ready to start</span>
+                </div>
+                <div class="summary-card">
+                    <span class="summary-label"><i class="status-ring status-ring-finished"></i> Completed</span>
+                    <strong id="summaryFinished">0</strong>
+                    <span class="summary-detail">finished projects</span>
+                </div>
+            </section>
             <section class="home-section home-project-section" id="pinnedSection" hidden>
                 <div class="section-heading">
                     <div>
-                        <p class="eyebrow">TOP PRIORITY</p>
+                        <p class="eyebrow">QUICK ACCESS</p>
                         <h3>Pinned projects</h3>
                     </div>
+                    <button class="text-button" id="allProjectsBtn">View all projects <span aria-hidden="true">→</span></button>
                 </div>
                 <div class="projects-grid" id="pinnedProjectsGrid"></div>
-            </section>
-            <section class="home-section home-project-section" id="latestSection" hidden>
-                <div class="section-heading">
-                    <div>
-                        <p class="eyebrow">LATEST ADDITIONS</p>
-                        <h3>Recently added</h3>
-                    </div>
-                </div>
-                <div class="projects-grid" id="projectsGrid"></div>
             </section>
             <section class="home-section home-project-section" id="recentSection" hidden>
                 <div class="section-heading">
                     <div>
-                        <p class="eyebrow">ACTIVITY</p>
+                        <p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p>
                         <h3>Recently opened</h3>
                     </div>
+                    <button class="text-button" id="viewAllRecentBtn" data-view-target="projects">All projects <span aria-hidden="true">→</span></button>
                 </div>
                 <div class="projects-grid" id="recentProjectsGrid"></div>
             </section>
+            <section class="home-section home-project-section" id="latestSection" hidden>
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">FRESHLY ADDED</p>
+                        <h3>Recently added</h3>
+                    </div>
+                    <button class="text-button" data-view-target="projects">All projects <span aria-hidden="true">→</span></button>
+                </div>
+                <div class="projects-grid" id="projectsGrid"></div>
+            </section>
             <div class="empty-state" id="emptyState" style="display:none">
-                <div class="empty-state-icon">📁</div>
+                <div class="empty-state-icon" aria-hidden="true">⌂</div>
+                <p class="eyebrow">A CLEAN SLATE</p>
                 <h2>No projects yet</h2>
-                <p>Add your first project folder to start building your workspace.</p>
-                <button class="btn btn-primary" id="emptyAddProjectBtn">＋ Create New Project</button>
+                <p>Add a local project folder to make this workspace yours.</p>
+                <button class="btn btn-primary" id="emptyAddProjectBtn">＋ Add your first project</button>
             </div>
         </main>
 
         <main id="projectsView" class="page-view" hidden>
             <div class="page-heading projects-heading">
                 <div>
-                    <p class="eyebrow">PROJECT LIBRARY</p>
-                    <h2>All Projects</h2>
-                    <p class="page-description">Track new ideas, active work, and finished projects in one place.</p>
+                    <p class="eyebrow">YOUR LIBRARY</p>
+                    <h2>Projects</h2>
+                    <p class="page-description">Browse, filter, and manage every project on this device.</p>
                 </div>
-                <button class="btn btn-primary start-project-btn" id="startProjectBtn">＋ Start Project</button>
+                <button class="btn btn-primary start-project-btn" id="startProjectBtn"><span aria-hidden="true">＋</span> Add project</button>
             </div>
             <div class="project-status-panel">
                 <div class="status-filter-group" role="group" aria-label="Filter projects by status">
-                    <button class="status-filter active" data-status-filter="all">All</button>
-                    <button class="status-filter" data-status-filter="new">New</button>
-                    <button class="status-filter" data-status-filter="working">Working</button>
-                    <button class="status-filter" data-status-filter="finished">Done</button>
+                    <button class="status-filter active" data-status-filter="all" aria-pressed="true">All</button>
+                    <button class="status-filter" data-status-filter="new" aria-pressed="false">New</button>
+                    <button class="status-filter" data-status-filter="working" aria-pressed="false">In progress</button>
+                    <button class="status-filter" data-status-filter="finished" aria-pressed="false">Completed</button>
                 </div>
-                <div class="status-legend" aria-label="Project status colors">
-                    <span><i class="status-ring status-ring-finished"></i> Done</span>
-                    <span><i class="status-ring status-ring-new"></i> New</span>
-                    <span><i class="status-ring status-ring-working"></i> Working</span>
+                <div class="library-tools">
+                    <label class="sort-control" for="projectSort">Sort</label>
+                    <select class="sort-select" id="projectSort" aria-label="Sort projects">
+                        <option value="recent">Recently added</option>
+                        <option value="opened">Recently opened</option>
+                        <option value="name">Name A–Z</option>
+                    </select>
                 </div>
             </div>
             <div class="projects-grid" id="allProjectsGrid"></div>
             <div class="empty-state" id="allProjectsEmptyState" style="display:none">
-                <div class="empty-state-icon">🗂️</div>
-                <h2>No projects in this filter</h2>
-                <p>Start a project or change the filter to see more of your work.</p>
-            </div>
-            <div class="project-fab" id="projectFab" aria-label="Create project by status" hidden>
-                <div class="project-fab-menu" id="projectFabMenu">
-                    <button class="project-fab-option status-new" data-fab-status="new">＋ New</button>
-                    <button class="project-fab-option status-working" data-fab-status="working">＋ Working</button>
-                    <button class="project-fab-option status-finished" data-fab-status="finished">＋ Done</button>
-                </div>
-                <button class="project-fab-trigger" id="projectFabTrigger" aria-label="Create project">＋</button>
+                <div class="empty-state-icon" aria-hidden="true">⌕</div>
+                <h2>No matching projects</h2>
+                <p>Try another search or status filter, or add a project to your library.</p>
             </div>
         </main>
 
         <main id="progressView" class="page-view" hidden>
             <div class="page-heading">
                 <div>
-                    <p class="eyebrow">PROJECT HEALTH</p>
-                    <h2>Progress</h2>
-                    <p class="page-description">See how your projects are distributed across each status.</p>
+                    <p class="eyebrow">WORKSPACE SNAPSHOT</p>
+                    <h2>Insights</h2>
+                    <p class="page-description">A quick read on how your local projects are moving.</p>
                 </div>
             </div>
             <section class="progress-card">
@@ -174,37 +195,37 @@
                     <input type="text" class="form-input" id="projectName" placeholder="My Awesome Project" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label" for="projectDescription">Description</label>
-                    <textarea class="form-textarea" id="projectDescription" placeholder="Brief description of what this project does..."></textarea>
-                </div>
-                <div class="form-group">
                     <label class="form-label" for="projectStatus">Project Status</label>
                     <select class="form-input" id="projectStatus">
                         <option value="new">New</option>
-                        <option value="working">Working</option>
-                        <option value="finished">Done</option>
+                        <option value="working">In progress</option>
+                        <option value="finished">Completed</option>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="form-group form-group-full">
+                    <label class="form-label" for="projectDescription">Description</label>
+                    <textarea class="form-textarea" id="projectDescription" placeholder="Brief description of what this project does..."></textarea>
+                </div>
+                <div class="form-group form-group-full">
                     <label class="form-label" for="projectPath">Folder Path *</label>
                     <input type="text" class="form-input" id="projectPath" placeholder="C:\Users\You\Projects\MyProject" required>
                     <span class="form-hint">Browse to auto-fill the folder name (and README, if present), then confirm/edit the full path — browsers can't read the full path for you. If a Projects Root is set, it only guesses <code>Root\FolderName</code> — add any extra subfolders yourself if the project is nested deeper.</span>
-                    <div style="margin-top:var(--space-sm);display:flex;gap:0.5rem;flex-wrap:wrap;">
+                    <div class="form-button-row">
                         <button type="button" class="btn btn-secondary" id="browsePathBtn">📂 Browse Folder</button>
                         <input type="file" id="pathFileInput" webkitdirectory directory style="display:none">
                         <button type="button" class="btn btn-secondary" id="verifyPathBtn">🔍 Verify Path</button>
                     </div>
                     <p class="form-hint path-verify-status" id="pathVerifyStatus"></p>
                 </div>
-                <div class="form-group">
+                <div class="form-group form-group-full">
                     <label class="form-label">README Source</label>
-                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                    <div class="form-button-row">
                         <button type="button" class="btn btn-secondary" id="browseReadmeBtn">📂 Browse README</button>
                         <input type="file" id="readmeFileInput" accept=".md,.markdown,.txt" style="display:none">
                         <button type="button" class="btn btn-secondary" id="pasteReadmeToggle">📋 Paste README</button>
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="form-group form-group-full">
                     <label class="form-label" for="projectUrl">Preview URL (optional)</label>
                     <input type="text" class="form-input" id="projectUrl" placeholder="http://localhost:3000">
                     <span class="form-hint">If this project runs on a dev server or has a live URL, add it here — Preview will show it right inside HYDEV instead of just opening a static file.</span>
@@ -306,6 +327,16 @@
                     <label class="form-label" for="projectsRootInput">Projects Root Folder</label>
                     <input type="text" class="form-input" id="projectsRootInput" placeholder="C:\Users\You\Projects">
                     <span class="form-hint">If your projects all live under one folder, set it here once. Browsing to add a project will then auto-fill the full path as <code>Root\FolderName</code> — browsers can't read a folder's full path on their own, so this is how you skip retyping it every time.</span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="androidStudioInput">Android Studio Executable (optional)</label>
+                    <input type="text" class="form-input" id="androidStudioInput" placeholder="C:\Program Files\Android\Android Studio\bin\studio64.exe">
+                    <span class="form-hint">If Android Studio is installed somewhere unusual, tell HYDEV the exact executable path so the one-click open works.</span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="vscodeInput">VS Code Executable (optional)</label>
+                    <input type="text" class="form-input" id="vscodeInput" placeholder="C:\Program Files\Microsoft VS Code\bin\code.cmd">
+                    <span class="form-hint">If VS Code is not on PATH, set the executable here and the app will open it reliably.</span>
                 </div>
             </div>
             <div class="modal-footer">

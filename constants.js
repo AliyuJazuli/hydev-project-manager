@@ -4,11 +4,13 @@
  */
 
 export const STORAGE_KEY = 'hydev-projects-v5';
-export const CACHE_NAME = 'hydev-pm-v6';
+export const CACHE_NAME = 'hydev-pm-v7';
 export const THEME_KEY = 'hydev-theme';
 export const PROJECTS_ROOT_KEY = 'hydev-projects-root';
+export const ANDROID_STUDIO_PATH_KEY = 'hydev-android-studio-exe';
+export const VS_CODE_PATH_KEY = 'hydev-vscode-exe';
 
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.5.0';
 
 export const COLORS = {
     primary: '#00D68F',
@@ -87,7 +89,6 @@ export const MODAL_IDS = {
 };
 
 export const ELEMENT_IDS = {
-    addProjectBtn: 'addProjectBtn',
     homeAddProjectBtn: 'homeAddProjectBtn',
     emptyAddProjectBtn: 'emptyAddProjectBtn',
     allProjectsBtn: 'allProjectsBtn',
@@ -105,9 +106,6 @@ export const ELEMENT_IDS = {
     progressRing: 'progressRing',
     progressTotal: 'progressTotal',
     progressInsights: 'progressInsights',
-    projectFab: 'projectFab',
-    projectFabTrigger: 'projectFabTrigger',
-    projectFabMenu: 'projectFabMenu',
     projectStatus: 'projectStatus',
     statusFilter: 'statusFilter',
     exportBtn: 'exportBtn',
@@ -150,6 +148,8 @@ export const ELEMENT_IDS = {
     previewBtn: 'previewBtn',
     settingsBtn: 'settingsBtn',
     projectsRootInput: 'projectsRootInput',
+    androidStudioInput: 'androidStudioInput',
+    vscodeInput: 'vscodeInput',
     saveSettingsBtn: 'saveSettingsBtn',
     closeSettingsBtn: 'closeSettingsBtn',
     overviewTitle: 'overviewTitle',

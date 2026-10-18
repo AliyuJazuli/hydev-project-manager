@@ -10,6 +10,7 @@ HYDEV Project Manager is a Progressive Web App (PWA) that helps you organize and
 
 - 📁 **Folder Selection** — Add any local project folder
 - 📝 **README Auto-detection** — Reads your project's `README.md` for description
+- 🧰 **Project Type Detection** — Locally detects Android, JavaScript frameworks, Node.js, Python, Rust, Go, .NET, PHP, Ruby, and web projects
 - 🔍 **Search & Filter** — Find projects instantly by name or description
 - 🎨 **Dark/Light Theme** — Switch themes to match your environment
 - 📱 **PWA Support** — Install on your home screen, works offline
@@ -88,8 +89,9 @@ Hydev Project Manager/
 
 1. **Add a Project** — Click "Add Project", give it a short name, and select the folder
 2. **Auto-description** — The app tries to read `README.md` from the folder
-3. **Manage** — Move projects up/down, edit, delete, or open in File Explorer
-4. **Search** — Filter by name or description in real-time
+3. **Project type** — When run through `start.bat`, the local server inspects project files and identifies the project type; existing projects are detected when the app starts
+4. **Manage** — Move projects up/down, edit, delete, or open in File Explorer
+5. **Search** — Filter by name or description in real-time
 
 ## Browser Support
 
